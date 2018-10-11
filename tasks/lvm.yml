@@ -1,0 +1,21 @@
+---
+
+- name: Install LVM software
+  yum: name=lvm2
+
+- name: Create Volume Group
+  lvg: vg={{ smd_jenkins_lvm_vgname }} pvs={{ smd_jenkins_lvm_pvs }} pesize={{ smd_jenkins_lvm_pesize }} force=yes
+  ignore_errors: yes
+
+- name: Create Logical Volume
+  lvol: vg={{ smd_jenkins_lvm_vgname }} lv={{ smd_jenkins_lvm_lvname }} size={{ smd_jenkins_lvm_lvsize }} force=yes
+
+- name: Create Filesystems
+  filesystem: fstype=xfs dev=/dev/{{ smd_jenkins_lvm_vgname }}/{{ smd_jenkins_lvm_lvname }}
+
+- name: Configure Filesystem
+  mount: state=mounted fstype=xfs src=/dev/{{ smd_jenkins_lvm_vgname }}/{{ smd_jenkins_lvm_lvname }} name={{ smd_jenkins_lvm_fs }} opts=noatime
+
+- name: Configure perms Filesystems
+  file: state=directory mode=755 path={{ smd_jenkins_lvm_fs }}
+

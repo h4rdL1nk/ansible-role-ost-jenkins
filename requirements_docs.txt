@@ -1,0 +1,5 @@
+setuptools
+sphinx
+sphinxcontrib-restbuilder
+git+https://github.com/htgoebel/yaml2rst
+pypandoc

@@ -1,0 +1,142 @@
+---
+
+- include: lvm.yml
+  when: smd_jenkins_configure_lvm
+  tags: smd_jenkins_lvm
+
+- name: Copy SSL configuration files
+  copy:
+    src: "{{ smd_jenkins_ssl_config.jks.file }}"
+    dest: "{{ smd_jenkins_lvm_fs }}/ssl/"
+  when: smd_jenkins_ssl | bool
+
+- name: Add cleaunp cron jobs
+  cron:
+    name: "{{ item.name }}"
+    hour: "{{ item.hour }}"
+    minute: "{{ item.minute }}"
+    weekday: "{{ item.weekday }}"
+    job: "{{ item.job }}"
+  with_items:
+    - name: "Docker cleanup"
+      hour: 0
+      minute: 0 
+      weekday: '*'
+      job: "docker system prune -af"
+    - name: "Monitors cleanup"
+      hour: 0
+      minute: 30
+      weekday: '*'
+      job: "rm -rf /opt/jetsetme/monitor/docker_mon/noob.notype.nolabel.* && sed -i '/^noob_notype/d' /opt/jetsetme/monitor/services.d/metamon && jsmmoninvoke node-create"
+    - name: "Backup jenkins"
+      hour: 0
+      minute: 0 
+      weekday: 1
+      job: "tar -c {{ smd_jenkins_lvm_fs }} | gzip -9 >/tmp/jenkins.tar.gz && chmod +r /tmp/jenkins.tar.gz"
+
+- name: Create anchore config directory
+  file:
+    path: "{{ smd_jenkins_anchore.root }}{{ smd_jenkins_anchore.config.engine.dir }}"
+    state: directory
+    mode: 0755
+
+- name: Create anchore engine config file
+  template:
+    src: anchore.j2
+    dest: "{{ smd_jenkins_anchore.root }}{{ smd_jenkins_anchore.config.engine.dir }}/config.yaml"
+
+- name: Create CI network
+  docker_network:
+    name: smd_infra_ci
+    driver: bridge
+    driver_options:
+      com.docker.network.driver.mtu: "1400"
+
+- name: Start anchore db container
+  docker_container: 
+    name: smd_infra_ci_anchore_postgres
+    image: "{{ smd_jenkins_anchore.config.db.image }}"
+    labels:
+      SERVICE_OWNER: infra
+      SERVICE_TYPE: ci
+      SERVICE_LABEL: anchore_postgres
+    network_mode: bridge
+    networks:
+      - name: smd_infra_ci
+    volumes:
+      - "{{ smd_jenkins_anchore.root }}{{ smd_jenkins_anchore.config.db.dir }}:/var/lib/postgresql/data/pgdata/:Z"
+    env:
+      POSTGRES_PASSWORD: sm4rtd1g1tsCIs3C
+      PGDATA: "/var/lib/postgresql/data/pgdata/"
+    log_driver: json-file
+    log_options:
+      max-size: "50m"
+      max-file: "1"
+    state: started
+    restart_policy: unless-stopped
+
+- name: Start anchore engine container
+  docker_container: 
+    name: smd_infra_ci_anchore_engine
+    image: "{{ smd_jenkins_anchore.config.engine.image }}"
+    labels:
+      SERVICE_OWNER: infra
+      SERVICE_TYPE: ci
+      SERVICE_LABEL: anchore_engine
+    volumes:
+      - "{{ smd_jenkins_anchore.root }}{{ smd_jenkins_anchore.config.engine.dir }}:/config/:Z"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    env:
+      ANCHORE_ADMIN_PASS: sm4rtd1g1ts
+      ANCHORE_HOST_ID: smd_infra_ci_anchore_engine 
+      ANCHORE_DB_HOST_ID: smd_infra_ci_anchore_postgres
+      ANCHORE_DB_USER: postgres
+      ANCHORE_DB_PASS: sm4rtd1g1tsCIs3C
+    network_mode: bridge
+    networks:
+      - name: smd_infra_ci
+    log_driver: json-file
+    log_options:
+      max-size: "50m"
+      max-file: "1"
+    state: started
+    restart_policy: unless-stopped
+
+- name: Start jenkins container
+  docker_container:
+    name: "smd_infra_jenkins"
+    image: "{{ smd_jenkins_image }}:{{ smd_jenkins_version }}"
+    memory: "{{smd_jenkins_memory_limit|int}}m"
+    oom_killer: no
+    env:
+      JENKINS_OPTS: "{%if smd_jenkins_ssl %}--httpPort=-1 --httpsPort={{smd_jenkins_bind_port}} --httpsKeyStore=/var/jenkins_home/ssl/{{smd_jenkins_ssl_config.jks.file}} --httpsKeyStorePassword={{ smd_jenkins_ssl_config.jks.password }}{%else%}--httpPort={{smd_jenkins_bind_port}}{%endif%}"
+      JAVA_OPTS: "-Djava.awt.headless=true -Xms{{ (smd_jenkins_memory_limit / 4)|int }}m -Xmx{{ (smd_jenkins_memory_limit / 4)|int }}m -Dcom.sun.jndi.ldap.connect.pool.protocol=DIGEST-MD5 -Dorg.apache.commons.jelly.tags.fmt.timeZone=Europe/Madrid"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "/{{smd_jenkins_lvm_fs}}/:/var/jenkins_home/:rw,Z"
+    labels:
+      SERVICE_OWNER: infra
+      SERVICE_TYPE: jenkins
+      SERVICE_LABEL: jenkins
+    network_mode: bridge
+    networks:
+      - name: smd_infra_ci
+    exposed_ports:
+      - "{{smd_jenkins_bind_port}}"
+    ports:
+      - "{{ hostvars[inventory_hostname][smd_jenkins_bind_network]}}:{{smd_jenkins_bind_port}}:{{smd_jenkins_bind_port}}"
+    log_driver: json-file
+    log_options:
+      max-size: "50m"
+      max-file: "1"
+    state: started
+    restart_policy: unless-stopped
+  tags: smd_jenkins_deploy
+
+- name: Wait for jenkins port to be opened
+  wait_for:
+    state: started
+    host: "{{hostvars[inventory_hostname][smd_jenkins_bind_network]}}"
+    port: "{{smd_jenkins_bind_port}}"
+    delay: 1
+    timeout: 30

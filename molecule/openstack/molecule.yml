@@ -1,0 +1,121 @@
+---
+dependency:
+  name: galaxy
+  options:
+    role-file: requirements.yml
+
+driver:
+  name: openstack
+
+lint:
+  name: yamllint
+
+platforms:
+  - name: ${BUILD_TAG:-molecule_instance_manual}
+    image: TID-RH7-3NIC.20171006 
+    flavor: TID-01CPU-02GB-20GB 
+    sshuser: cloud-user
+    ip_pool: ext_mgmt
+    network: DOCKER_MGMT
+    volumes:
+      - name: ${BUILD_TAG:-molecule_instance_manual}_volume_1
+        size: 10
+        device: /dev/vdb
+      - name: ${BUILD_TAG:-molecule_instance_manual}_volume_2
+        size: 10
+        device: /dev/vdc
+
+provisioner:
+  name: ansible
+  env:
+    ROLE_NAME: ${BUILD_TAG:-ansible-role-smd-confd}
+  options:
+    become: true
+  inventory:
+    group_vars: 
+      all:
+        smd_bootstrap_role_repos_enabled: true
+        smd_bootstrap_role_chrony_enabled: true
+        smd_bootstrap_role_timezone_enabled: true
+        smd_bootstrap_role_rhn_enabled: false
+        smd_boostrap_role_update_so_enabled: false
+
+        # Repository configuration
+        smd_repos_repo_proxy: http://proxy2pdi.service.dsn.inet:6666
+        smd_repos_common_repository:
+          - name: rhel7
+            baseurl: 'http://repos.hi.inet/redhat/rhel7_dsn-x86_64/RPMS.all'
+            desc: 'RHEL7 Repository'
+          - name: epel7
+            baseurl: 'http://artifactory.hi.inet/artifactory/yum-epel/7/x86_64/'
+            desc: 'EPEL7 Repository'
+
+        smd_repos_repository:
+          - name: jsmart
+            baseurl: 'http://artifactory.hi.inet/artifactory/yum-jsm-release/x86_64/'
+            desc: 'JetSetMe Release Repository'
+          - name: pythonart
+            baseurl: 'http://artifactory.hi.inet/artifactory/common/python/x86_64/'
+            desc: 'Python Repo Artifactory'
+
+        # Configure IPTABLES service
+        smd_bootstrap_iptables_enabled: yes
+        smd_bootstrap_iptables_state: started
+
+        # Configure SELINUX state
+        smd_bootstrap_selinux_state: disabled
+
+        # Additional packages to add to base installation.
+        smd_bootstrap_additional_packages:
+          - python-docker-py
+          - libsemanage-python
+          - policycoreutils-python
+          - iptables-services
+          - jetsetme-monitor-metamon
+
+      # Docker config
+        smd_docker_lvm_config: false
+        smd_docker_storage_device: /dev/vdb
+        smd_docker_bind_network: DOCKER_MGMT
+        smd_docker_bind_port: 2376
+        smd_docker_proxy: 'http://proxy2pdi.service.dsn.inet:6666'
+
+        # Etcd config
+        smd_etcd_cluster_group: all
+        smd_etcd_bind_network: DEFAULT
+
+        # Jenkins config
+        smd_jenkins_image: registry.smartdigits.io/smartdigits/jenkins-sdi
+        smd_jenkins_version: latest
+        smd_jenkins_bind_network: DOCKER_MGMT
+        smd_jenkins_bind_port: 8443
+        smd_jenkins_memory_limit: 1024
+        smd_jenkins_configure_lvm: true
+        smd_jenkins_lvm_pvs: /dev/vdc
+        smd_jenkins_lvm_lvsize: 8G
+        smd_jenkins_ssl: false
+
+    host_vars:
+      ${BUILD_TAG:-molecule_instance_manual}:
+        DOCKER_MGMT: 127.0.0.1
+        DEFAULT: 127.0.0.1
+        iptype: ipv4
+        networks:
+          DOCKER_MGMT: 
+            ipv4: 127.0.0.1
+
+  lint:
+    name: ansible-lint
+  playbooks:
+    prepare: ../../molecule_common/scenarios/openstack/create.yml
+    create: ../../molecule_common/scenarios/openstack/create.yml
+    converge: playbook.yml
+    destroy: ../../molecule_common/scenarios/openstack/destroy.yml
+
+scenario:
+  name: default
+
+verifier:
+  name: testinfra
+  lint:
+    name: flake8

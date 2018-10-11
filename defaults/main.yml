@@ -1,0 +1,127 @@
+---
+# .. vim: foldmarker=[[[,]]]:foldmethod=marker
+
+# Default variables
+# =================
+
+# .. contents:: Sections
+#    :local:
+#
+# Configuration
+# -------------
+# .. envvar:: smd_jenkins_image [[[
+#
+#    Docker image to use
+#
+smd_jenkins_image: registry.smartdigits.io/smartdigits/jenkins-sdi
+#
+# ]]]
+# .. envvar:: smd_jenkins_version [[[
+#
+#    Docker image version
+#
+smd_jenkins_version: latest
+#
+# ]]]
+# .. envvar:: smd_jenkins_bind_network [[[
+#
+#    Inventory var that contains the ip where we listen
+#
+smd_jenkins_bind_network: DOCKER_MGMT
+#
+# ]]]
+# .. envvar:: smd_jenkins_bind_port [[[
+#
+#    Port where container will listen
+#
+smd_jenkins_bind_port: 8080
+#
+# ]]]
+# .. envvar:: smd_jenkins_memory_limit [[[
+#
+#    Memory assigned to container in MB
+#
+smd_jenkins_memory_limit: 2048
+#
+# ]]]
+# .. envvar:: smd_jenkins_configure_lvm [[[
+#
+#    Enable LVM volume creation
+#
+smd_jenkins_configure_lvm: false
+#
+# ]]]
+# .. envvar:: smd_mongodb_lvm_pvs [[[
+#
+#    LVM Physical volume device
+#
+smd_jenkins_lvm_pvs: /dev/sdd
+#
+# ]]]
+# .. envvar:: smd_jenkins_lvm_pesize [[[
+#
+#    LVM Physical extend size
+#
+smd_jenkins_lvm_pesize: 32
+#
+# ]]]
+# .. envvar:: smd_jenkins_lvm_vgname [[[
+#
+#    LVM Volume group name
+#
+smd_jenkins_lvm_vgname: vg_jenkins
+#
+# ]]]
+# .. envvar:: smd_jenkins_lvm_lvname [[[
+#
+#    LVM Volume name
+#
+smd_jenkins_lvm_lvname: var_lib
+#
+# ]]]
+# .. envvar:: smd_jenkins_lvm_lvsize [[[
+#
+#    LVM Volume size ( set absolute values to pass idempotence )
+#
+smd_jenkins_lvm_lvsize: 100%FREE
+#
+# ]]]
+# .. envvar:: smd_jenkins_lvm_fs [[[
+#
+#    When creating LVM this is the mountpoint of the created volume, also is the jenkins data path attached to container
+#
+smd_jenkins_lvm_fs: /var/lib/jenkins
+#
+# ]]]
+# .. envvar:: smd_jenkins_ssl [[[
+#
+#    Configure SSL listener
+#
+smd_jenkins_ssl: false
+#
+# ]]]
+# .. envvar:: smd_jenkins_ssl_config [[[
+#
+#    SSL listener configuration parameters
+#
+smd_jenkins_ssl_config:
+  jks:
+    file: smartdigits.io.jks
+    password: smartdigits
+#
+# ]]]
+# .. envvar:: smd_jenkins_anchore [[[
+#
+#    Anchore ( engine + db ) configuration
+#
+smd_jenkins_anchore:
+  root: /var/dockershared/anchore/
+  config:
+    engine:
+      image: "registry.smartdigits.io/smartdigits/anchore-engine:latest"
+      dir: config
+    db:
+      image: "registry.smartdigits.io/smartdigits/postgres:9"
+      dir: db
+#
+# ]]]

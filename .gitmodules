@@ -1,0 +1,3 @@
+[submodule "molecule_common"]
+	path = molecule_common
+	url = git@github.com:h4rdL1nk/molecule_common.git

@@ -1,0 +1,8 @@
+---
+- hosts: all
+  sudo: yes
+
+  roles:
+    - { role: ansible-role-smd-bootstrap }
+    - { role: ansible-role-smd-docker }
+    - { role: ansible-role-smd-jenkins }

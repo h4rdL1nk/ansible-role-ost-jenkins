@@ -1,0 +1,8 @@
+molecule
+ansible==2.5
+yamllint
+ansible-lint
+chardet
+python-vagrant
+arrow
+shade
